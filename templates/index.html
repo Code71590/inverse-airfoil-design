@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroInverse — Surrogate-Based Airfoil Design</title>
+    <meta name="description" content="AI-powered inverse airfoil design system using neural network surrogates">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <path d="M2 20C2 20 8 8 16 8C24 8 30 20 30 20" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M2 20C2 20 8 14 16 14C24 14 30 20 30 20" stroke="url(#grad2)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+                    <defs>
+                        <linearGradient id="grad1" x1="2" y1="14" x2="30" y2="14"><stop stop-color="#818CF8"/><stop offset="1" stop-color="#34D399"/></linearGradient>
+                        <linearGradient id="grad2" x1="2" y1="17" x2="30" y2="17"><stop stop-color="#818CF8"/><stop offset="1" stop-color="#34D399"/></linearGradient>
+                    </defs>
+                </svg>
+                <h1>AeroInverse</h1>
+            </div>
+            <span class="badge">Surrogate-Based Design</span>
+        </div>
+        <div class="header-right">
+            <div class="status-indicator" id="modelStatus">
+                <div class="status-dot"></div>
+                <span>Model Ready</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-grid">
+        <!-- Left Panel: Controls -->
+        <section class="panel controls-panel">
+            <div class="panel-header">
+                <h2>Design Targets</h2>
+                <p class="subtitle">Set your desired aerodynamic performance</p>
+            </div>
+
+            <div class="control-section">
+                <h3>Operating Conditions</h3>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="mach">Mach Number</label>
+                        <input type="range" id="machSlider" min="0.2" max="0.7" step="0.1" value="0.3">
+                        <input type="number" id="mach" value="0.3" step="0.1" min="0.2" max="0.7">
+                    </div>
+                    <div class="input-group">
+                        <label for="alpha">Angle of Attack (°)</label>
+                        <input type="range" id="alphaSlider" min="-5" max="15" step="0.5" value="2.0">
+                        <input type="number" id="alpha" value="2.0" step="0.5" min="-5" max="15">
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Aerodynamic Targets</h3>
+                <div class="target-grid">
+                    <div class="target-card">
+                        <div class="target-header">
+                            <span class="target-label cl-color">C<sub>L</sub></span>
+                            <label class="toggle">
+                                <input type="checkbox" id="clToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <input type="number" id="targetCL" value="0.8" step="0.05" class="target-input">
+                        <div class="weight-row">
+                            <span>Weight</span>
+                            <input type="number" id="weightCL" value="1.0" step="0.1" min="0" class="weight-input">
+                        </div>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-header">
+                            <span class="target-label cd-color">C<sub>D</sub></span>
+                            <label class="toggle">
+                                <input type="checkbox" id="cdToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <input type="number" id="targetCD" value="0.012" step="0.001" class="target-input">
+                        <div class="weight-row">
+                            <span>Weight</span>
+                            <input type="number" id="weightCD" value="5.0" step="0.5" min="0" class="weight-input">
+                        </div>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-header">
+                            <span class="target-label cm-color">C<sub>M</sub></span>
+                            <label class="toggle">
+                                <input type="checkbox" id="cmToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <input type="number" id="targetCM" value="-0.05" step="0.01" class="target-input" disabled>
+                        <div class="weight-row">
+                            <span>Weight</span>
+                            <input type="number" id="weightCM" value="0.5" step="0.1" min="0" class="weight-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Optimization Method</h3>
+                <div class="method-selector">
+                    <button class="method-btn active" data-method="gradient" id="btnGradient">
+                        <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M14 2L10 2M14 2L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Gradient (Fast)
+                    </button>
+                    <button class="method-btn" data-method="evolutionary" id="btnEvolutionary">
+                        <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="4" cy="12" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="12" cy="4" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                        Evolutionary (Robust)
+                    </button>
+                </div>
+            </div>
+
+            <button class="design-btn" id="designBtn" onclick="runDesign()">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L17 10L10 17M3 10H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Run Inverse Design</span>
+            </button>
+
+            <div class="loading-bar" id="loadingBar">
+                <div class="loading-progress"></div>
+            </div>
+        </section>
+
+        <!-- Center: Airfoil Shape -->
+        <section class="panel airfoil-panel">
+            <div class="panel-header">
+                <h2>Designed Airfoil</h2>
+                <div class="panel-actions">
+                    <button class="icon-btn" title="Export coordinates" onclick="exportCoords()">
+                        <svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2v8M4 6l4 4 4-4M2 12v2h12v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="airfoil-canvas-wrapper">
+                <canvas id="airfoilCanvas" width="800" height="400"></canvas>
+                <div class="airfoil-empty" id="airfoilEmpty">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M4 32C4 32 12 12 24 12C36 12 44 32 44 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.3"/></svg>
+                    <p>Set your targets and click <strong>Run Inverse Design</strong></p>
+                </div>
+            </div>
+
+            <!-- Results Summary -->
+            <div class="results-grid" id="resultsGrid" style="display:none">
+                <div class="result-card">
+                    <span class="result-label">C<sub>L</sub></span>
+                    <span class="result-value cl-color" id="resCL">—</span>
+                    <span class="result-target" id="resCLTarget"></span>
+                </div>
+                <div class="result-card">
+                    <span class="result-label">C<sub>D</sub></span>
+                    <span class="result-value cd-color" id="resCD">—</span>
+                    <span class="result-target" id="resCDTarget"></span>
+                </div>
+                <div class="result-card">
+                    <span class="result-label">C<sub>M</sub></span>
+                    <span class="result-value cm-color" id="resCM">—</span>
+                    <span class="result-target" id="resCMTarget"></span>
+                </div>
+                <div class="result-card">
+                    <span class="result-label">L/D</span>
+                    <span class="result-value ld-color" id="resLD">—</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Performance Plots -->
+        <section class="panel plots-panel">
+            <div class="panel-header">
+                <h2>Performance</h2>
+                <div class="panel-actions">
+                    <select id="plotMach" class="plot-select" onchange="updateSweep()">
+                        <option value="0.2">M=0.2</option>
+                        <option value="0.3" selected>M=0.3</option>
+                        <option value="0.4">M=0.4</option>
+                        <option value="0.5">M=0.5</option>
+                        <option value="0.6">M=0.6</option>
+                        <option value="0.7">M=0.7</option>
+                    </select>
+                </div>
+            </div>
+            <div class="plots-container">
+                <div class="plot-card">
+                    <h4>C<sub>L</sub> vs α</h4>
+                    <canvas id="clAlphaPlot" width="350" height="200"></canvas>
+                </div>
+                <div class="plot-card">
+                    <h4>C<sub>D</sub> vs α</h4>
+                    <canvas id="cdAlphaPlot" width="350" height="200"></canvas>
+                </div>
+                <div class="plot-card">
+                    <h4>C<sub>L</sub>/C<sub>D</sub> vs α</h4>
+                    <canvas id="ldAlphaPlot" width="350" height="200"></canvas>
+                </div>
+                <div class="plot-card">
+                    <h4>Drag Polar (C<sub>L</sub> vs C<sub>D</sub>)</h4>
+                    <canvas id="dragPolar" width="350" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- CST Parameters -->
+            <div class="cst-section" id="cstSection" style="display:none">
+                <h3>CST Parameters</h3>
+                <div class="cst-grid">
+                    <div class="cst-col">
+                        <h4>Upper Surface</h4>
+                        <div id="cstUpper" class="cst-values"></div>
+                    </div>
+                    <div class="cst-col">
+                        <h4>Lower Surface</h4>
+                        <div id="cstLower" class="cst-values"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>AeroInverse — Surrogate-Based Inverse Airfoil Design System • Final Year Project</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
