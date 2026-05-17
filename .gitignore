@@ -11,7 +11,7 @@ Aerodynamic/
 processed_data/
 
 # Model checkpoints (large binary)
-models/
+# models/
 
 # Environment
 .env
