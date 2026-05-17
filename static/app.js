@@ -387,20 +387,154 @@ async function updateSweep() {
     }
 }
 
-// ── Export Coordinates ──────────────────────────
-function exportCoords() {
-    if (!currentResult) { alert('No design to export.'); return; }
-    
-    let content = 'AeroInverse Designed Airfoil\n';
-    for (let i = 0; i < currentResult.x_coords.length; i++) {
-        content += `${currentResult.x_coords[i].toFixed(8)}  ${currentResult.y_coords[i].toFixed(8)}\n`;
+// ── Download Dropdown ───────────────────────────
+function toggleDownloadMenu(e) {
+    e.stopPropagation();
+    if (!currentResult) { alert('No design to export yet. Run Inverse Design first.'); return; }
+    const menu = document.getElementById('downloadMenu');
+    menu.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+    document.getElementById('downloadMenu')?.classList.remove('open');
+});
+
+// ── Ramer-Douglas-Peucker (RDP) Simplification ──
+/**
+ * RDP algorithm for polyline simplification.
+ * Recursively removes points that deviate less than `epsilon` from the
+ * straight line connecting the segment endpoints.
+ * Ideal for airfoil coordinates because it always keeps leading-edge
+ * and trailing-edge points and retains high curvature regions automatically.
+ *
+ * @param {number[]} xs - x coordinates
+ * @param {number[]} ys - y coordinates
+ * @param {number} epsilon - maximum allowed perpendicular deviation (in chord units)
+ * @returns {boolean[]} mask - true = keep this point
+ */
+function rdpSimplify(xs, ys, epsilon) {
+    const n = xs.length;
+    if (n <= 2) return new Array(n).fill(true);
+
+    const mask = new Array(n).fill(false);
+    mask[0] = true;
+    mask[n - 1] = true;
+
+    function perpendicularDist(px, py, ax, ay, bx, by) {
+        const dx = bx - ax, dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+        return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
     }
-    
+
+    function rdp(start, end) {
+        if (end - start <= 1) return;
+        let maxDist = 0, maxIdx = start;
+        for (let i = start + 1; i < end; i++) {
+            const d = perpendicularDist(xs[i], ys[i], xs[start], ys[start], xs[end], ys[end]);
+            if (d > maxDist) { maxDist = d; maxIdx = i; }
+        }
+        if (maxDist > epsilon) {
+            mask[maxIdx] = true;
+            rdp(start, maxIdx);
+            rdp(maxIdx, end);
+        }
+    }
+
+    rdp(0, n - 1);
+    return mask;
+}
+
+/**
+ * Airfoil-aware coordinate reduction.
+ * Splits the airfoil at the leading edge, applies a tighter RDP epsilon
+ * to the high-curvature leading-edge region (front 15% chord) and a
+ * looser epsilon to the flatter mid/aft sections, then recombines.
+ */
+function reduceAirfoilCoords(xs, ys) {
+    const n = xs.length;
+
+    // Find the leading edge index (minimum x)
+    let leIdx = 0;
+    for (let i = 1; i < n; i++) {
+        if (xs[i] < xs[leIdx]) leIdx = i;
+    }
+
+    // Upper surface: from TE (index 0) → LE
+    const xU = xs.slice(0, leIdx + 1);
+    const yU = ys.slice(0, leIdx + 1);
+
+    // Lower surface: from LE → TE (end)
+    const xL = xs.slice(leIdx);
+    const yL = ys.slice(leIdx);
+
+    function adaptiveRDP(xArr, yArr) {
+        const m = xArr.length;
+        // Points within first 15% chord get tighter tolerance
+        const leThreshold = 0.15;
+        const epsTight = 0.0002;   // ~0.02% chord — preserves leading-edge curvature
+        const epsLoose = 0.0008;   // ~0.08% chord — safe for flat aft sections
+
+        // Run RDP twice on two zones and merge masks
+        const leEnd = xArr.findIndex(x => x > leThreshold);
+        const splitIdx = (leEnd > 2) ? leEnd : m;
+
+        const maskA = rdpSimplify(xArr.slice(0, splitIdx), yArr.slice(0, splitIdx), epsTight);
+        const maskB = rdpSimplify(xArr.slice(splitIdx - 1), yArr.slice(splitIdx - 1), epsLoose);
+
+        // Combine — overlap point at splitIdx-1 is already kept in both
+        const fullMask = [...maskA, ...maskB.slice(1)];
+        return fullMask;
+    }
+
+    const maskU = adaptiveRDP(xU, yU);
+    const maskL = adaptiveRDP(xL, yL);
+
+    // Reconstruct: upper TE→LE, then lower LE→TE (skip shared LE point)
+    let xOut = [], yOut = [];
+    for (let i = 0; i < xU.length; i++) if (maskU[i]) { xOut.push(xU[i]); yOut.push(yU[i]); }
+    for (let i = 1; i < xL.length; i++) if (maskL[i]) { xOut.push(xL[i]); yOut.push(yL[i]); }
+
+    return { x: xOut, y: yOut };
+}
+
+// ── Export Coordinates ──────────────────────────
+function exportCoords(mode) {
+    document.getElementById('downloadMenu').classList.remove('open');
+    if (!currentResult) { alert('No design to export.'); return; }
+
+    let xs, ys, filename, header;
+
+    if (mode === 'reduced') {
+        const reduced = reduceAirfoilCoords(currentResult.x_coords, currentResult.y_coords);
+        xs = reduced.x;
+        ys = reduced.y;
+        filename = 'designed_airfoil_reduced.csv';
+        header = `# AeroInverse Designed Airfoil — Geometry-Accurate Reduced Coordinates\n` +
+                 `# Points: ${xs.length} (RDP-simplified from ${currentResult.x_coords.length}, adaptive e=0.02-0.08% chord)\n` +
+                 `x,y\n`;
+    } else {
+        xs = currentResult.x_coords;
+        ys = currentResult.y_coords;
+        filename = 'designed_airfoil_full.csv';
+        header = `# AeroInverse Designed Airfoil — Full CST Coordinates\n` +
+                 `# Points: ${xs.length} (cosine-spaced, 200 pts/surface)\n` +
+                 `x,y\n`;
+    }
+
+    let content = header;
+    for (let i = 0; i < xs.length; i++) {
+        content += `${xs[i].toFixed(8)},${ys[i].toFixed(8)}\n`;
+    }
+
     const blob = new Blob([content], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'designed_airfoil.dat';
+    a.download = filename;
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 // ── Window Resize ──────────────────────────────

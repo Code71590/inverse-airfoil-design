@@ -339,3 +339,94 @@ input[type="range"]::-webkit-slider-thumb {
 
 .result-card { transition: var(--transition); }
 .result-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-glow); }
+
+/* ── Download Dropdown ───────────────────────── */
+.download-dropdown {
+    position: relative;
+}
+
+/* Make icon-btn wider to hold chevron */
+.download-dropdown .icon-btn {
+    width: auto;
+    padding: 0 10px;
+    gap: 5px;
+    min-width: 44px;
+}
+
+.dropdown-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.download-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    min-width: 250px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    z-index: 200;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.download-menu.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+}
+
+.download-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.download-option:last-child {
+    border-bottom: none;
+}
+
+.download-option:hover {
+    background: var(--bg-card-hover);
+}
+
+.dl-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-blue);
+    flex-shrink: 0;
+}
+
+.download-option strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--text-primary);
+}
+
+.download-option small {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
