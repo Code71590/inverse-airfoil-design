@@ -1,6 +1,6 @@
 # AeroInverse — Surrogate-Based Inverse Airfoil Design System
 
-> **AI-powered inverse airfoil design** using neural network surrogates trained on 1.48 million XFOIL simulations. Given target aerodynamic performance, the system finds the optimal airfoil geometry in seconds.
+> **AI-powered inverse airfoil design** using neural network surrogates trained on 1.48 million aerodynamic simulations. Given target aerodynamic performance, the system finds the optimal airfoil geometry in seconds.
 
 <p align="center">
   <img src="plots/report/07_inverse_design_examples.png" alt="Inverse Design Examples" width="100%">
@@ -71,7 +71,7 @@ Traditional airfoil design relies on iterative CFD simulations — a process tha
 │                     TRAINING PIPELINE                               │
 │                                                                     │
 │  ┌──────────┐     ┌───────────┐     ┌──────────────┐     ┌───────┐ │
-│  │  Airfoil  │     │    CST    │     │   Forward    │     │ XFOIL │ │
+│  │  Airfoil  │     │    CST    │     │   Forward    │     │ Aero  │ │
 │  │  .dat     │────▶│  Fitting  │────▶│   Surrogate  │◀────│ Polar │ │
 │  │  files    │     │ (6+6=12)  │     │   Training   │     │ Data  │ │
 │  └──────────┘     └───────────┘     └──────────────┘     └───────┘ │
@@ -108,7 +108,7 @@ This enables a **compact, continuous, smooth** design space where every point co
 The preprocessing pipeline (`preprocess_data.py`) performs:
 1. **Coordinate parsing** — Reads ~50K airfoil `.dat` files from the shape database
 2. **CST fitting** — Fits 12 CST coefficients to each airfoil via least-squares
-3. **XFOIL polar parsing** — Extracts CL, CD, CM at each (Mach, α) condition
+3. **Polar parsing** — Extracts CL, CD, CM at each (Mach, α) condition from the aerodynamic data
 4. **Dataset consolidation** — Creates unified CSV with columns: `[airfoil_name, cst_0..11, mach, alpha, CL, CD, CM]`
 
 <p align="center">
@@ -155,8 +155,7 @@ Two optimization strategies are available:
 
 | Property | Value |
 |----------|-------|
-| **Source** | CST-perturbed airfoils from UIUC database |
-| **Solver** | XFOIL v6.97 |
+| **Source** | UIUC Airfoil Database |
 | **Reynolds number** | 1 × 10⁶ |
 | **Mach numbers** | 0.2, 0.3, 0.4, 0.5, 0.6, 0.7 |
 | **Training samples** | 1,482,985 |
@@ -257,7 +256,7 @@ python app.py
 ```
 Project Work 1/
 ├── cst_module.py              # CST parameterization (fit/reconstruct)
-├── preprocess_data.py         # Data pipeline: XFOIL → CSV dataset
+├── preprocess_data.py         # Data pipeline: aerodynamic polars → CSV dataset
 ├── surrogate_model.py         # PyTorch MLP surrogate definition
 ├── train_surrogate.py         # Training script (early stopping, plots)
 ├── sklearn_surrogate.py       # Scikit-learn fallback model
@@ -278,7 +277,7 @@ Project Work 1/
 │   └── test.csv               # 185K test samples
 ├── plots/report/              # All validation figures
 ├── Shape/                     # Raw airfoil coordinate data
-└── Aerodynamic/               # Raw XFOIL polar results
+└── Aerodynamic/               # Raw aerodynamic polar data
 ```
 
 ---
@@ -313,7 +312,7 @@ python app.py
 | **Scientific** | NumPy, SciPy, Pandas, Scikit-learn |
 | **Visualization** | Matplotlib |
 | **Web** | Flask, HTML5 Canvas, Vanilla CSS/JS |
-| **Data Source** | XFOIL v6.97 |
+| **Data Source** | UIUC Airfoil Database |
 | **Parameterization** | Class Shape Transformation (CST) |
 
 ---
