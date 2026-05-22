@@ -382,65 +382,85 @@ def fig_inverse_design_examples(model, normalizer):
         {'name': 'Transonic', 'targets': {'CL': 0.6, 'CD': 0.015}, 'mach': 0.6, 'alpha': 3.0},
     ]
     
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+    fig = plt.figure(figsize=(16, 9))
+    gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.55, wspace=0.35,
+                           height_ratios=[1.1, 1.0])
     
     for j, case in enumerate(test_cases):
-        result = designer.design_gradient(
+        result = designer.design_evolutionary(
             case['targets'], case['mach'], case['alpha'],
-            n_restarts=10
+            maxiter=300, popsize=40
         )
         
         if result is None:
+            print(f"   ✗ Optimization failed for {case['name']}")
             continue
         
         # Top row: airfoil shapes
-        ax_shape = axes[0, j]
+        ax_shape = fig.add_subplot(gs[0, j])
         ax_shape.fill(result['x_coords'], result['y_coords'],
                      alpha=0.15, color=COLORS['CL'])
         ax_shape.plot(result['x_coords'], result['y_coords'],
                      linewidth=2, color=COLORS['CL'])
         ax_shape.plot([0, 1], [0, 0], 'k--', alpha=0.3, linewidth=0.5)
         ax_shape.set_xlim(-0.05, 1.05)
-        ax_shape.set_aspect('equal')
-        ax_shape.set_xlabel('x/c')
-        ax_shape.set_ylabel('y/c')
+        x_c = np.array(result['x_coords'])
+        y_c = np.array(result['y_coords'])
+        y_ext = max(abs(y_c.min()), abs(y_c.max())) * 1.35 + 0.04
+        ax_shape.set_ylim(-y_ext, y_ext)
+        ax_shape.set_aspect('equal', adjustable='datalim')
+        ax_shape.set_xlabel('x/c', fontsize=9)
+        ax_shape.set_ylabel('y/c', fontsize=9)
+        ax_shape.tick_params(labelsize=8)
         
-        # Title with targets and achieved
+        # Title with targets and achieved — add ✓/≈/✗ symbols
         t = case['targets']
         p = result['predicted']
+        cl_err = abs(p['CL'] - t['CL']) / max(abs(t['CL']), 1e-6) * 100
+        cd_err = abs(p['CD'] - t['CD']) / max(abs(t['CD']), 1e-6) * 100
+        cl_sym = '\u2713' if cl_err < 5 else ('\u2248' if cl_err < 20 else '\u2717')
+        cd_sym = '\u2713' if cd_err < 5 else ('\u2248' if cd_err < 20 else '\u2717')
         ax_shape.set_title(
-            f"{case['name']} (M={case['mach']}, α={case['alpha']}°)\n"
-            f"Target: CL={t.get('CL','—')}, CD={t.get('CD','—')}\n"
-            f"Achieved: CL={p['CL']:.4f}, CD={p['CD']:.5f}",
-            fontsize=10
+            f"{case['name']}  (M={case['mach']}, \u03b1={case['alpha']}\u00b0)\n"
+            f"Target:    CL={t['CL']:.3f}  CD={t['CD']:.4f}\n"
+            f"Achieved: CL={p['CL']:.3f} {cl_sym}  CD={p['CD']:.4f} {cd_sym}",
+            fontsize=9.5, linespacing=1.5
         )
         
         # Bottom row: alpha sweeps
-        ax_sweep = axes[1, j]
+        ax_sweep = fig.add_subplot(gs[1, j])
         cst_vec = np.array(result['cst_upper'] + result['cst_lower'])
         sweep = designer.sweep_alpha(cst_vec, case['mach'])
         alphas = [s['alpha'] for s in sweep]
         cls = [s['CL'] for s in sweep]
         cds = [s['CD'] for s in sweep]
         
-        ax_sweep.plot(alphas, cls, '-', color=COLORS['CL'], linewidth=2, label='CL')
-        ax_sweep.set_xlabel('α (°)')
-        ax_sweep.set_ylabel('CL', color=COLORS['CL'])
-        ax_sweep.tick_params(axis='y', labelcolor=COLORS['CL'])
+        ax_sweep.plot(alphas, cls, '-', color=COLORS['CL'], linewidth=2)
+        ax_sweep.set_xlabel('\u03b1 (\u00b0)', fontsize=9)
+        ax_sweep.set_ylabel('CL', color=COLORS['CL'], fontsize=9)
+        ax_sweep.tick_params(axis='y', labelcolor=COLORS['CL'], labelsize=8)
+        ax_sweep.tick_params(axis='x', labelsize=8)
         
         ax2 = ax_sweep.twinx()
-        ax2.plot(alphas, cds, '-', color=COLORS['CD'], linewidth=2, label='CD')
-        ax2.set_ylabel('CD', color=COLORS['CD'])
-        ax2.tick_params(axis='y', labelcolor=COLORS['CD'])
+        ax2.plot(alphas, cds, '-', color=COLORS['CD'], linewidth=2)
+        ax2.set_ylabel('CD', color=COLORS['CD'], fontsize=9)
+        ax2.tick_params(axis='y', labelcolor=COLORS['CD'], labelsize=8)
         ax2.spines['right'].set_visible(True)
         
-        ax_sweep.axhline(t.get('CL', None), color=COLORS['CL'], linestyle=':', alpha=0.5)
-        ax_sweep.axvline(case['alpha'], color=COLORS['gray'], linestyle='--', alpha=0.4)
-        ax_sweep.set_title('CL & CD vs α', fontsize=10)
+        # Target reference lines (dotted)
+        ax_sweep.axhline(t['CL'], color=COLORS['CL'], linestyle=':', alpha=0.7,
+                         linewidth=1.4)
+        ax2.axhline(t['CD'], color=COLORS['CD'], linestyle=':', alpha=0.7,
+                    linewidth=1.4)
+        # Design-point alpha marker
+        ax_sweep.axvline(case['alpha'], color=COLORS['gray'], linestyle='--',
+                         alpha=0.5, linewidth=1)
+        ax_sweep.set_title('CL & CD  vs  \u03b1', fontsize=10)
     
-    fig.suptitle('Inverse Design Demonstrations', fontsize=14, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    plt.savefig(os.path.join(REPORT_DIR, '07_inverse_design_examples.png'))
+    fig.suptitle('Inverse Design Demonstrations  [Evolutionary Optimizer — Robust]',
+                 fontsize=13, fontweight='bold', y=1.01)
+    plt.savefig(os.path.join(REPORT_DIR, '07_inverse_design_examples.png'),
+                bbox_inches='tight')
     plt.close()
     print("   ✓ Saved 07_inverse_design_examples.png")
 
